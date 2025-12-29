@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<title>寿司族館</title>
+<style>
+  body {
+    margin: 0;
+    background: #0b3c5d;
+    color: white;
+    font-family: monospace;
+    text-align: center;
+  }
+  canvas {
+    background: #1ca3ec;
+    border: 4px solid #fff;
+    display: block;
+    margin: 10px auto;
+    image-rendering: pixelated;
+  }
+  .desc {
+    font-size: 14px;
+    line-height: 1.4;
+    margin: 6px 0 10px;
+  }
+</style>
+</head>
+<body>
+
+<h1>🍣 寿司族館 🍣</h1>
+
+<p class="desc">
+  泳ぐ寿司をクリックしてGET！<br>
+  新しい寿司が次々と展示されます。
+</p>
+
+<p id="count">本日の展示数：0貫</p>
+<p>Score: <span id="score">0</span></p>
+
+<canvas id="game" width="360" height="240"></canvas>
+
+<script>
+const canvas = document.getElementById("game");
+const ctx = canvas.getContext("2d");
+ctx.imageSmoothingEnabled = false;
+
+let score = 0;
+const MAX_SUSHI = 20;
+const BUBBLE_COUNT = 40;
+
+/* 寿司データ */
+const sushiList = [
+  { name:"ikura", src:"いくらのお寿司.png", speed:1.4 },
+  { name:"uni", src:"うにのお寿司.png", speed:0.7 },
+  { name:"ebi", src:"えびのお寿司.png", speed:1.1 },
+  { name:"tamago", src:"たまごのお寿司.png", speed:0.8 },
+  { name:"maguro", src:"まぐろのお寿司.png", speed:1.7 }
+];
+
+/* 画像読み込み */
+const images = {};
+sushiList.forEach(s => {
+  const img = new Image();
+  img.src = s.src;
+  images[s.name] = img;
+});
+
+/* 寿司クラス */
+class Sushi {
+  constructor() {
+    const d = sushiList[Math.floor(Math.random() * sushiList.length)];
+    this.type = d.name;
+    this.img = images[d.name];
+    this.size = 24;
+    this.x = Math.random() * (canvas.width - this.size);
+    this.y = Math.random() * (canvas.height - this.size);
+    this.vx = (Math.random() * d.speed + 0.3) * (Math.random() < 0.5 ? -1 : 1);
+    this.vy = Math.random() * 0.6 - 0.3;
+  }
+
+  update(sushis) {
+    // 群れっぽい挙動
+    sushis.forEach(o => {
+      if (o === this) return;
+      const dx = o.x - this.x;
+      const dy = o.y - this.y;
+      const dist = Math.hypot(dx, dy);
+      if (dist > 0 && dist < 50) {
+        this.vx += dx / dist * 0.005;
+        this.vy += dy / dist * 0.005;
+      }
+    });
+
+    this.x += this.vx;
+    this.y += this.vy;
+
+    if (this.x < 0 || this.x > canvas.width - this.size) this.vx *= -1;
+    if (this.y < 0 || this.y > canvas.height - this.size) this.vy *= -1;
+  }
+
+  draw() {
+    ctx.drawImage(this.img, this.x, this.y, this.size, this.size);
+  }
+
+  hit(mx, my) {
+    return mx >= this.x && mx <= this.x + this.size &&
+           my >= this.y && my <= this.y + this.size;
+  }
+}
+
+/* 水泡 */
+class Bubble {
+  constructor() {
+    this.reset();
+  }
+  reset() {
+    this.x = Math.random() * canvas.width;
+    this.y = canvas.height + Math.random() * 40;
+    this.r = Math.random() * 2 + 1;
+    this.speed = Math.random() * 0.6 + 0.3;
+    this.a = Math.random() * 0.5 + 0.3;
+  }
+  update() {
+    this.y -= this.speed;
+    if (this.y < -10) this.reset();
+  }
+  draw() {
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, this.r, 0, Math.PI * 2);
+    ctx.fillStyle = `rgba(255,255,255,${this.a})`;
+    ctx.fill();
+  }
+}
+
+let sushis = [];
+let bubbles = [];
+
+for (let i = 0; i < MAX_SUSHI; i++) sushis.push(new Sushi());
+for (let i = 0; i < BUBBLE_COUNT; i++) bubbles.push(new Bubble());
+
+canvas.addEventListener("click", e => {
+  const r = canvas.getBoundingClientRect();
+  const mx = e.clientX - r.left;
+  const my = e.clientY - r.top;
+
+  sushis = sushis.filter(s => {
+    if (s.hit(mx, my)) {
+      score++;
+      document.getElementById("score").textContent = score;
+      return false;
+    }
+    return true;
+  });
+
+  if (sushis.length < MAX_SUSHI) sushis.push(new Sushi());
+});
+
+function loop() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  bubbles.forEach(b => { b.update(); b.draw(); });
+  sushis.forEach(s => { s.update(sushis); s.draw(); });
+
+  document.getElementById("count").textContent =
+    `本日の展示数：${sushis.length}貫`;
+
+  requestAnimationFrame(loop);
+}
+loop();
+</script>
+
+</body>
+</html>
